@@ -12,9 +12,12 @@ import matplotlib.pyplot as plt
 
 
 '''
+Splits a single input file into a training and a testing file (90-10).
 '''
 
 def split_database(filename, output_path):
+
+    # Open the csv file as a list dictionaries.
 
     csv_file = open(filename);
     csv_reader = csv.DictReader(csv_file)
@@ -22,7 +25,14 @@ def split_database(filename, output_path):
     csv_file.close()
     csv_headers = ','.join(csv_data[0].keys())
 
+    # We shuffle the list to simplify the process of extracting
+    # random items from it. The training and test sets must contain
+    # completely random items.
+
     random.shuffle(csv_data)
+
+    # Create a file for the training set and one for the testing
+    # set. We, also, write the csv headers to them.
 
     training_file_path = output_path + "/training-0.csv"
     training_file = open(training_file_path, 'w+')
@@ -33,15 +43,28 @@ def split_database(filename, output_path):
     testing_file = open(testing_file_path, 'w+')
     testing_file.write(csv_headers + '\n')
 
-    for i in range(0, len(csv_data)):
-        data = ','.join(csv_data[i].values()) + '\n'
-        if i < testing_file_count:
-            testing_file.write(data)
-        else:
-            training_file.write(data)
+    # Write the first 90% of the items to the training file and the
+    # remaining 10% to the testing file.
 
-    training_file.close()
+    testing_items = csv_data[0:testing_file_count]
+    testing_data = [','.join(item.values()) + '\n' for item in testing_items]
+    testing_string = ''.join(testing_data)
+
+    training_items = csv_data[testing_file_count:]
+    training_data = [','.join(item.values()) + '\n' for item in training_items]
+    training_string = '\n'.join(training_data)
+
+    testing_file.write(testing_string)
+    training_file.write(training_string)
+
+    # Close the files and return their paths. We return each path inside
+    # a list for compatibility reasons. In the future we might want
+    # to implement a better cross validation mechanism that generates
+    # more than one pair files, this will help simplify other parts of the
+    # implementation.
+
     testing_file.close()
+    training_file.close()
 
     return [training_file_path], [testing_file_path]
 
@@ -79,7 +102,7 @@ def analyse_inputs(bts_data_file_path, training_files, output_path):
     bts_lon_min = lon_min
     bts_lon_max = lon_max
 
-    for filepath in training_files:
+    for i in range(0, len(training_files)):
 
         lat_min = 180
         lat_max = -180
@@ -87,10 +110,17 @@ def analyse_inputs(bts_data_file_path, training_files, output_path):
         lon_max = -180
 
         set_points = []
-        set_csv_file = open(filepath);
+        set_csv_file = open(training_files[i]);
         set_csv_reader = csv.DictReader(set_csv_file)
         set_csv_data = list(set_csv_reader)
         set_csv_file.close()
+
+        map_file_name = '/inputs-map-' + str(i) + '.png'
+        map_file_path = output_path + map_file_name
+
+        statistics_file_name = '/inputs-statistics-' + str(i) + '.txt'
+        statistics_file_path = output_path + statistics_file_name
+        statistics_file = open(statistics_file_path, 'w+')
 
         for measurement in set_csv_data:
 
@@ -126,7 +156,8 @@ def analyse_inputs(bts_data_file_path, training_files, output_path):
 
             matplotlibMap.plot(x, y, 'or', ms=10, mew=2)
 
-        plt.savefig('map.png')
+        plt.savefig(map_file_path)
+        statistics_file.close()
 
     return 0
 
