@@ -38,6 +38,7 @@ def okumura_hata(f, hm, hb, ak, ck, d):
         return lossSubUrban
 
     else:
+
         return lossUrban
 
 

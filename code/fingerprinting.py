@@ -8,6 +8,9 @@ import math
 import numpy
 import pathloss
 
+import smopy
+import matplotlib.pyplot as plt
+
 from geographiclib.geodesic import Geodesic, Math
 
 
@@ -59,8 +62,8 @@ def compute_path_losses(bts_data, coordinates):
         parameters['freq'] = 1800
         parameters['rxH'] = 1.5
         parameters['txH'] = 50
-        parameters['area_kind'] = 'Urban'
-        parameters['city_kind'] = 'Medium'
+        parameters['area_kind'] = 'urban'
+        parameters['city_kind'] = 'medium'
 
         lat1, lon1 = float(bts['lat']), float(bts['lon'])
         lat2, lon2 = coordinates
@@ -96,6 +99,8 @@ def create_grid(bts_data, test_data, tile_dimension_km):
 
     for i in range(0, lat_points):
 
+        lon = lon_min
+
         grid.append([])
 
         for j in range(0, lon_points):
@@ -125,7 +130,7 @@ def localize(values, grid):
         for j in range(0, len(grid[0])):
 
             losses = grid[i][j][1]
-            diff = [pow(values[k]-losses[k], 2) for k in range(0, len(losses))]
+            diff = [pow(losses[k]-values[k], 2) for k in range(0, len(losses))]
             norm = math.sqrt(sum(diff))
 
             if norm < distance:
@@ -139,27 +144,46 @@ def localize(values, grid):
 '''
 '''
 
-def estimate(bts_file, training_files, testing_files, output_folder):
+def estimate(bts_file, training_files, testing_files, output_folder, algorithm):
 
     estimates = []
+
+    # Open the csv file containing data about the base transceiver
+    # stations (BTSs) as a list of dictionaries.
 
     bts_csv_file = open(bts_file);
     bts_csv_reader = csv.DictReader(bts_csv_file)
     bts_csv_data = list(bts_csv_reader)
     bts_csv_file.close()
 
+    # Loop through each test file. Their results will be combined
+    # in the list named 'estimates'.
+
     for test_file in testing_files:
 
         errors = []
+        details = []
+
+        # Open the csv file containing the test data as a list of dictionaries.
 
         testing_csv_file = open(test_file);
         testing_csv_reader = csv.DictReader(testing_csv_file)
         testing_csv_data = list(testing_csv_reader)
         testing_csv_file.close()
 
+        # Create the fingerprinting grid. It will generate a set of 2D points
+        # based on the given resolution and the test data coordinates minimums
+        # and maximums.
+
         grid = create_grid(bts_csv_data, testing_csv_data, 0.01)
 
+        # Loop through each measurement in the test data.
+
         for item in testing_csv_data:
+
+            # Below we look for point of the grid with the closest RSSI
+            # signature to the measurement signature, using the Euclidean
+            # distance.
 
             lat1 = float(item['lat'])
             lon1 = float(item['lon'])
@@ -172,11 +196,84 @@ def estimate(bts_file, training_files, testing_files, output_folder):
             error_km = coordinates_distance_km(lat1, lon1, lat2, lon2)
             error_mt = error_km*1000
 
+            # We record the real coordinates, the predicted coordinates and
+            # the error in meters. Later, we will use this information to
+            # plot the real coordinates agains the predicted one for every
+            # measurement. The error will be used to compute the mean and
+            # the standard deviation.
+
+            info = {
+                'real_coordinates': (lat1, lon1),
+                'predicted_coordinates': (lat2, lon2),
+                'error_mt': error_mt
+            }
+
             errors.append(error_mt)
+            details.append(info)
 
-        print('mean: ' + str(numpy.mean(errors)))
-        print('standard deviation: ' + str(numpy.std(errors)))
+        estimates.append({
+            'error_mean': numpy.mean(errors),
+            'error_stddev': numpy.std(errors),
+            'data': details
+        })
 
-        estimates.append(errors)
+        # Now, let's draw the grid on a map. We cannot draw every line since
+        # the resultant figure will, most likely, contain a filled square,
+        # because the grid tile resolution is too low.
+
+        file_index = testing_files.index(test_file)
+        map_file_name = '/fingerprinting-'
+        map_file_name += algorithm + '-grid-' + str(file_index) + '.png'
+        map_file_path = output_folder + map_file_name
+
+        grid_lat_min, grid_lon_min = grid[0][0][0]
+        grid_lat_max, grid_lon_max = grid[-1][-1][0]
+
+        zoomLevel = 15
+        region = (grid_lat_min, grid_lon_min, grid_lat_max, grid_lon_max)
+        smopyMap = smopy.Map(region, z=zoomLevel)
+        matplotlibMap = smopyMap.show_mpl(figsize=(8, 8))
+
+        for i in (range(0, len(grid), 10)+[len(grid)-1]):
+
+            lat1, lon1 = grid[i][0][0]
+            lat2, lon2 = grid[i][-1][0]
+
+            x1, y1 = smopyMap.to_pixels(lat1, lon1)
+            x2, y2 = smopyMap.to_pixels(lat2, lon2)
+
+            matplotlibMap.plot((x1, x2), (y1, y2), 'k-', alpha=0.5)
+
+        for j in (range(0, len(grid[0]), 10)+[len(grid[0])-1]):
+
+            lat1, lon1 = grid[0][j][0]
+            lat2, lon2 = grid[-1][j][0]
+
+            x1, y1 = smopyMap.to_pixels(lat1, lon1)
+            x2, y2 = smopyMap.to_pixels(lat2, lon2)
+
+            matplotlibMap.plot((x1, x2), (y1, y2), 'k-', alpha=0.5)
+
+        plt.savefig(map_file_path)
+
+    # Let's write the method statistics (errors, and deviations) to a file.
+
+    statistics_file_name = '/fingerprinting-' + algorithm + '-statistics.txt'
+    statistics_file_path = output_folder + statistics_file_name
+    statistics_file = open(statistics_file_path, 'w+')
+
+    for estimate in estimates:
+
+        file_index = estimates.index(estimate)
+        mean = estimate['error_mean']
+        stddev = estimate['error_stddev']
+
+        content = '\nTraining File ' + str(file_index) + ' Statistics:\n\n'
+        content = content + 'Error mean: ' + str(mean) + ' '
+        content = content + 'stddev: ' + str(stddev) + '\n'
+
+        statistics_file.write(content)
+
+    statistics_file.close()
 
     return estimates

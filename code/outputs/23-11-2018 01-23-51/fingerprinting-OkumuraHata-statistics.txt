@@ -1,0 +1,4 @@
+
+Training File 0 Statistics:
+
+Error mean: 515.8947761268802 stddev: 410.35978202136477
