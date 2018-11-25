@@ -52,24 +52,45 @@ def coordinates_min_max(data):
 '''
 '''
 
-def compute_path_losses(bts_data, coordinates):
+def compute_path_losses(bts_data, coordinates, algorithm):
 
     losses = []
+    parameters = {}
 
-    for bts in bts_data:
+    if algorithm == 'OkumuraHata':
 
-        parameters = {}
         parameters['freq'] = 1800
         parameters['rxH'] = 1.5
-        parameters['txH'] = 50
+        parameters['txH'] = 50.0
         parameters['area_kind'] = 'urban'
         parameters['city_kind'] = 'medium'
+
+    elif algorithm == 'COST231':
+
+        parameters['freq'] = 1800
+        parameters['rxH'] = 1.5
+        parameters['txH'] = 50.0
+        parameters['ws'] = 15.0
+        parameters['bs'] = 0.5
+        parameters['hr'] = 3.0
+        parameters['area_kind'] = 'urban'
+        parameters['city_kind'] = 'medium'
+
+    elif algorithm == 'ECC33':
+
+        parameters['freq'] = 1800
+        parameters['rxH'] = 1.5
+        parameters['txH'] = 50.0
+        parameters['area_kind'] = 'urban'
+        parameters['city_kind'] = 'medium'
+
+    for bts in bts_data:
 
         lat1, lon1 = float(bts['lat']), float(bts['lon'])
         lat2, lon2 = coordinates
 
         distance = coordinates_distance_km(lat1, lon1, lat2, lon2)
-        loss = pathloss.pathloss("OkumuraHata", parameters, distance)
+        loss = pathloss.pathloss(algorithm, parameters, distance)
 
         losses.append(loss)
 
@@ -79,7 +100,7 @@ def compute_path_losses(bts_data, coordinates):
 '''
 '''
 
-def create_grid(bts_data, test_data, tile_dimension_km):
+def create_grid(bts_data, test_data, tile_dimension_km, algorithm):
 
     grid = []
 
@@ -106,7 +127,7 @@ def create_grid(bts_data, test_data, tile_dimension_km):
         for j in range(0, lon_points):
 
             coordinates = (lat, lon)
-            path_losses = compute_path_losses(bts_data, coordinates)
+            path_losses = compute_path_losses(bts_data, coordinates, algorithm)
 
             grid[i].append([coordinates, path_losses])
 
@@ -175,7 +196,7 @@ def estimate(bts_file, training_files, testing_files, output_folder, algorithm):
         # based on the given resolution and the test data coordinates minimums
         # and maximums.
 
-        grid = create_grid(bts_csv_data, testing_csv_data, 0.01)
+        grid = create_grid(bts_csv_data, testing_csv_data, 0.01, algorithm)
 
         # Loop through each measurement in the test data.
 
@@ -203,6 +224,7 @@ def estimate(bts_file, training_files, testing_files, output_folder, algorithm):
             # the standard deviation.
 
             info = {
+                'point_id': item['pontoId'],
                 'real_coordinates': (lat1, lon1),
                 'predicted_coordinates': (lat2, lon2),
                 'error_mt': error_mt
@@ -212,6 +234,10 @@ def estimate(bts_file, training_files, testing_files, output_folder, algorithm):
             details.append(info)
 
         estimates.append({
+            'coordinates_min': grid[0][0][0],
+            'coordinates_max': grid[-1][-1][0],
+            'error_min': numpy.amin(errors),
+            'error_max': numpy.amax(errors),
             'error_mean': numpy.mean(errors),
             'error_stddev': numpy.std(errors),
             'data': details
@@ -222,6 +248,7 @@ def estimate(bts_file, training_files, testing_files, output_folder, algorithm):
         # because the grid tile resolution is too low.
 
         file_index = testing_files.index(test_file)
+
         map_file_name = '/fingerprinting-'
         map_file_name += algorithm + '-grid-' + str(file_index) + '.png'
         map_file_path = output_folder + map_file_name
@@ -234,7 +261,7 @@ def estimate(bts_file, training_files, testing_files, output_folder, algorithm):
         smopyMap = smopy.Map(region, z=zoomLevel)
         matplotlibMap = smopyMap.show_mpl(figsize=(8, 8))
 
-        for i in (range(0, len(grid), 10)+[len(grid)-1]):
+        for i in (range(0, len(grid), 8)+[len(grid)-1]):
 
             lat1, lon1 = grid[i][0][0]
             lat2, lon2 = grid[i][-1][0]
@@ -244,7 +271,7 @@ def estimate(bts_file, training_files, testing_files, output_folder, algorithm):
 
             matplotlibMap.plot((x1, x2), (y1, y2), 'k-', alpha=0.5)
 
-        for j in (range(0, len(grid[0]), 10)+[len(grid[0])-1]):
+        for j in (range(0, len(grid[0]), 8)+[len(grid[0])-1]):
 
             lat1, lon1 = grid[0][j][0]
             lat2, lon2 = grid[-1][j][0]
@@ -255,25 +282,5 @@ def estimate(bts_file, training_files, testing_files, output_folder, algorithm):
             matplotlibMap.plot((x1, x2), (y1, y2), 'k-', alpha=0.5)
 
         plt.savefig(map_file_path)
-
-    # Let's write the method statistics (errors, and deviations) to a file.
-
-    statistics_file_name = '/fingerprinting-' + algorithm + '-statistics.txt'
-    statistics_file_path = output_folder + statistics_file_name
-    statistics_file = open(statistics_file_path, 'w+')
-
-    for estimate in estimates:
-
-        file_index = estimates.index(estimate)
-        mean = estimate['error_mean']
-        stddev = estimate['error_stddev']
-
-        content = '\nTraining File ' + str(file_index) + ' Statistics:\n\n'
-        content = content + 'Error mean: ' + str(mean) + ' '
-        content = content + 'stddev: ' + str(stddev) + '\n'
-
-        statistics_file.write(content)
-
-    statistics_file.close()
 
     return estimates

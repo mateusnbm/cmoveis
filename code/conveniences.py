@@ -11,12 +11,6 @@ import matplotlib.pyplot as plt
 
 
 '''
-'''
-
-# ...
-
-
-'''
 Splits a single input file into a training and a testing file (90-10).
 '''
 
@@ -29,6 +23,20 @@ def split_database(filename, output_path):
     csv_data = list(csv_reader)
     csv_file.close()
     csv_headers = ','.join(csv_data[0].keys())
+
+    # Remove lines that contain an unknown attribute value.
+
+    indexes = []
+
+    for i in range(0, len(csv_data)):
+
+        if 'NA' in csv_data[i].values():
+
+            indexes.append(i)
+
+    for index in indexes:
+
+        del csv_data[index]
 
     # We shuffle the list to simplify the process of extracting
     # random items from it. The training and test sets must contain
@@ -215,7 +223,7 @@ def analyse_inputs(bts_data_file_path, training_files, output_path):
 
         # ...
 
-        content = 'Training File '+str(i)+'  Statistics:\n\n'
+        content = 'Training File '+str(i)+' Statistics:\n\n'
         content = content + 'Latitude mean: ' + str(lat_mean) + ' '
         content = content + 'stddev: ' + str(lat_stddev) + '\n'
         content = content + 'Longitude mean: ' + str(lon_mean) + ' '
@@ -246,13 +254,13 @@ def analyse_inputs(bts_data_file_path, training_files, output_path):
 
             x, y = smopyMap.to_pixels(point[0], point[1])
 
-            matplotlibMap.plot(x, y, 'og', ms=10, mew=2, alpha=0.2)
+            matplotlibMap.plot(x, y, 'og', ms=5, mew=2, alpha=0.2)
 
         for point in bts_points:
 
             x, y = smopyMap.to_pixels(point[0], point[1])
 
-            matplotlibMap.plot(x, y, 'or', ms=30, mew=2)
+            matplotlibMap.plot(x, y, 'or', ms=10, mew=2)
 
         plt.savefig(map_file_path)
 
