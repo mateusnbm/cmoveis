@@ -1,8 +1,0 @@
-
-Training File 0 Statistics:
-
-Error Min: 47.73313620209095
-Error Max: 1802.5606246348432
-Error mean: 570.0461051949451
-Error Standard Deviation: 364.8395104517802
-

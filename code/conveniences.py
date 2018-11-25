@@ -9,6 +9,43 @@ import smopy
 import numpy as np
 import matplotlib.pyplot as plt
 
+from geographiclib.geodesic import Geodesic, Math
+
+
+'''
+'''
+
+def coordinates_distance_km(lat1, lon1, lat2, lon2):
+
+    extract = lambda g:g['s12']/1000
+    mask = Geodesic.DISTANCE | Geodesic.AZIMUTH | Geodesic.REDUCEDLENGTH
+    gab = Geodesic.WGS84.Inverse(lat1, lon1, lat2, lon2, mask)
+
+    return extract(gab)
+
+
+'''
+'''
+
+def coordinates_min_max(data):
+
+    lat_min = 180
+    lat_max = -180
+    lon_min = 180
+    lon_max = -180
+
+    for item in data:
+
+        latitude = float(item['lat'])
+        longitude = float(item['lon'])
+
+        lat_min = min(lat_min, latitude)
+        lat_max = max(lat_max, latitude)
+        lon_min = min(lon_min, longitude)
+        lon_max = max(lon_max, longitude)
+
+    return lat_min, lon_min, lat_max, lon_max
+
 
 '''
 Splits a single input file into a training and a testing file (90-10).
@@ -34,9 +71,7 @@ def split_database(filename, output_path):
 
             indexes.append(i)
 
-    for index in indexes:
-
-        del csv_data[index]
+    csv_data = [i for j, i in enumerate(csv_data) if j not in indexes]
 
     # We shuffle the list to simplify the process of extracting
     # random items from it. The training and test sets must contain
@@ -61,7 +96,7 @@ def split_database(filename, output_path):
 
     training_items = csv_data[testing_file_count:]
     training_data = [','.join(item.values()) + '\n' for item in training_items]
-    training_string = '\n'.join(training_data)
+    training_string = ''.join(training_data)
 
     testing_items = csv_data[0:testing_file_count]
     testing_data = [','.join(item.values()) + '\n' for item in testing_items]

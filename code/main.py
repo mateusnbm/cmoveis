@@ -13,6 +13,8 @@ import smopy
 import numpy as np
 import matplotlib.pyplot as plt
 
+import knn
+import regression
 import pathloss
 import conveniences
 import fingerprinting
@@ -51,7 +53,7 @@ training_files, testing_files = conveniences.split_database(input_file_path, out
 conveniences.analyse_inputs(bts_file_path, training_files, output_folder_path)
 
 # Localize the testing samples using the basic finferprinting algorithm.
-
+'''
 fingerprinting_okumura_results = (
     fingerprinting.estimate(
         bts_file_path,
@@ -60,7 +62,7 @@ fingerprinting_okumura_results = (
         output_folder_path,
         'OkumuraHata'
         )
-)
+    )
 
 fingerprinting_cost231_results = (
     fingerprinting.estimate(
@@ -70,7 +72,7 @@ fingerprinting_cost231_results = (
         output_folder_path,
         'COST231'
         )
-)
+    )
 
 fingerprinting_ecc33_results = (
     fingerprinting.estimate(
@@ -80,7 +82,40 @@ fingerprinting_ecc33_results = (
         output_folder_path,
         'ECC33'
         )
-)
+    )
+'''
+
+knn_1_results = (
+    knn.estimate(
+        1,
+        training_files,
+        testing_files
+        )
+    )
+
+knn_5_results = (
+    knn.estimate(
+        5,
+        training_files,
+        testing_files
+        )
+    )
+
+regression_bayesian_results = (
+    regression.estimate(
+        'BayesianRidge',
+        training_files,
+        testing_files
+        )
+    )
+
+regression_theil_results = (
+    regression.estimate(
+        'TheilSenRegressor',
+        training_files,
+        testing_files
+        )
+    )
 
 # Pack the estimations in one list and generate the output artefacts in
 # a single loop through the results. We generate the statistics files,
@@ -88,7 +123,7 @@ fingerprinting_ecc33_results = (
 
 boxplot_data = []
 boxplot_file_name = output_folder_path + '/boxplot.png'
-
+'''
 results = [
     {
         'method': 'fingerprinting-OkumuraHata',
@@ -104,6 +139,40 @@ results = [
         'method': 'fingerprinting-ECC33',
         'method_results': fingerprinting_ecc33_results,
         'method_hist_title': u'Fingerprinting (ECC-33)'
+    },
+    {
+        'method': 'kNN-1',
+        'method_results': knn_1_results,
+        'method_hist_title': u'kNN (k=3)'
+    },
+    {
+        'method': 'kNN-5',
+        'method_results': knn_5_results,
+        'method_hist_title': u'kNN (k=5)'
+    }
+]
+'''
+
+results = [
+    {
+        'method': 'kNN-1',
+        'method_results': knn_1_results,
+        'method_hist_title': u'kNN (k=1)'
+    },
+    {
+        'method': 'kNN-5',
+        'method_results': knn_5_results,
+        'method_hist_title': u'kNN (k=5)'
+    },
+    {
+        'method': 'Regression-BayesianRidge',
+        'method_results': regression_bayesian_results,
+        'method_hist_title': u'Regressão (BayesianRidge)'
+    },
+    {
+        'method': 'Regression-TheilSenRegressor',
+        'method_results': regression_theil_results,
+        'method_hist_title': u'Regressão (TheilSenRegressor)'
     }
 ]
 
@@ -212,9 +281,8 @@ for result in results:
 
 plt.figure()
 plt.boxplot(boxplot_data)
-plt.xticks([1, 2, 3], ['FP OH', 'FP COST-231', 'FP ECC-33'])
+plt.xticks([1, 2, 3], ['FP OH', 'FP COST-231', 'FP ECC-33', 'kNN OH'])
+plt.xlabel(u'Método')
+plt.ylabel(u'Erro (metros)')
+plt.title(u'Comparando Métodos')
 plt.savefig(boxplot_file_name, bbox_inches='tight')
-
-plt.figure()
-plt.boxplot(boxplot_data)
-plt.show()
